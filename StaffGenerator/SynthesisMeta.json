@@ -1,0 +1,10 @@
+{
+  "Nickname": "StaffGenerator",
+  "Visibility": "Exclude",
+  "OneLineDescription": "Generates Staves for spells",
+  "LongDescription": "A clone of T3nd0s The Staff Machine",
+  "PreferredAutoVersioning": "Default",
+  "RequiredMods": [
+    "Dragonborn.esm"
+  ]
+}
