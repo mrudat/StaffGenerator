@@ -1,6 +1,6 @@
 {
   "Nickname": "StaffGenerator",
-  "Visibility": "Exclude",
+  "Visibility": "Visible",
   "OneLineDescription": "Generates Staves for spells",
   "LongDescription": "A clone of T3nd0s The Staff Machine",
   "PreferredAutoVersioning": "Default",

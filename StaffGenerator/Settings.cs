@@ -10,10 +10,18 @@ namespace StaffGenerator
 
         public string StaffNameSuffix = " Staff";
 
-        public HashSet<FormLink<IBookGetter>> SpellBooksToIgnore = new();
+        public bool CopySpellEffectsToExistingStaffEnchantments = true;
 
-        public HashSet<FormLink<ISpellGetter>> SpellsToIgnore = new();
+        public bool OverrideNamesOfExistingStaves = false;
 
-        public HashSet<FormLink<IWeaponGetter>> StavesToIgnore = new();
+        public bool SetStaffPriceToSpellBookPrice = false;
+
+        public HashSet<FormLink<IBookGetter>> SpellBooksNotToCreateStavesFor = new();
+
+        public HashSet<FormLink<ISpellGetter>> SpellsNotToCreateStavesFor = new();
+
+        public HashSet<FormLink<IObjectEffectGetter>> StaffEnchantmentsNotToRefresh = new();
+
+        public HashSet<FormLink<IWeaponGetter>> StavesToNotRefreshRecipesFor = new();
     }
 }
