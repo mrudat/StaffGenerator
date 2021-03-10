@@ -214,13 +214,13 @@ namespace StaffGenerator
                         if (baseEffect.IsNull) continue;
                         Autovivify(staffEnchantmentsByMagicEffectTemp, NewFormLink(baseEffect)).Add(staffEnchantment);
                     }
-                    staffEnchantmentsByEditorIDBuilder.Add(staffEnchantment.EditorID, staffEnchantment);
+                    staffEnchantmentsByEditorIDBuilder[staffEnchantment.EditorID] = staffEnchantment;
                 }
 
                 var staffEnchantmentsByMagicEffectBuilder = ImmutableDictionary.CreateBuilder<FormLink<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>>();
                 foreach (var item in staffEnchantmentsByMagicEffectTemp)
                 {
-                    staffEnchantmentsByMagicEffectBuilder.Add(item.Key, item.Value.ToImmutable());
+                    staffEnchantmentsByMagicEffectBuilder[item.Key] = item.Value.ToImmutable();
                 }
 
                 staffEnchantmentsByEditorID = staffEnchantmentsByEditorIDBuilder.ToImmutable();
@@ -248,7 +248,7 @@ namespace StaffGenerator
                     {
                         if (staff.Template.IsNull) continue;
                         stavesBuilder.Add(staff.AsLink());
-                        stavesByEditorIDBuilder.Add(staff.EditorID, staff);
+                        stavesByEditorIDBuilder[staff.EditorID] = staff;
                         Autovivify(enchantedStavesByEnchantmentTemp, NewFormLink(staff.ObjectEffect)).Add(staff);
                     }
                 }
@@ -256,7 +256,7 @@ namespace StaffGenerator
                 var enchantedStavesByEnchantmentBuilder = ImmutableDictionary.CreateBuilder<FormLink<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>>();
                 foreach (var item in enchantedStavesByEnchantmentTemp)
                 {
-                    enchantedStavesByEnchantmentBuilder.Add(item.Key, item.Value.ToImmutable());
+                    enchantedStavesByEnchantmentBuilder[item.Key] = item.Value.ToImmutable();
                 }
 
                 staves = stavesBuilder.ToImmutable();
@@ -276,7 +276,7 @@ namespace StaffGenerator
                         if (!(recipe.CreatedObjectCount.Value == 1)) continue;
                     if (recipe.CreatedObject.IsNull) continue;
                     if (!staves.Contains(recipe.CreatedObject.FormKey)) continue;
-                    recipesByCreatedStaffBuilder.Add(new FormLink<IWeaponGetter>(recipe.CreatedObject.FormKey), recipe);
+                    recipesByCreatedStaffBuilder[new FormLink<IWeaponGetter>(recipe.CreatedObject.FormKey)] = recipe;
                 }
 
                 recipesByCreatedStaff = recipesByCreatedStaffBuilder.ToImmutable();
@@ -292,8 +292,8 @@ namespace StaffGenerator
                 foreach (var leveledList in state.LoadOrder.PriorityOrder.LeveledItem().WinningOverrides())
                 {
                     if (leveledList.EditorID is null) continue;
-                    leveledListsByFormKeyBuilder.Add(leveledList.FormKey, leveledList);
-                    leveledListsByEditorIDBuilder.Add(leveledList.EditorID, leveledList);
+                    leveledListsByFormKeyBuilder[leveledList.FormKey] = leveledList;
+                    leveledListsByEditorIDBuilder[leveledList.EditorID] = leveledList;
                 }
 
                 leveledListsByFormKey = leveledListsByFormKeyBuilder.ToImmutable();
