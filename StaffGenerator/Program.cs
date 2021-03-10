@@ -433,16 +433,43 @@ namespace StaffGenerator
                     if (!staffData.EnchantmentExisted) continue;
                     if (Settings.Value.StaffEnchantmentsNotToRefresh.Contains(staffData.Enchantment)) continue;
 
-                    var modifiedEnchantment = state.PatchMod.ObjectEffects.GetOrAddAsOverride(staffData.Enchantment);
-                    modifiedEnchantment.Name = staffData.SpellName;
-                    modifiedEnchantment.CastType = staffData.Spell.CastType;
-                    modifiedEnchantment.TargetType = staffData.Spell.TargetType;
-                    modifiedEnchantment.Effects.Clear();
-                    modifiedEnchantment.Effects.AddRange(spellToStaffEffects(staffData));
+                    var enchantment = staffData.Enchantment;
+                    var modifiedEnchantment = enchantment.DeepCopy();
 
-                    // TODO if no change made, don't copy.
+                    bool modified = false;
 
-                    staffData.Enchantment = modifiedEnchantment;
+                    if (modifiedEnchantment.Name != staffData.SpellName)
+                    {
+                        modifiedEnchantment.Name = staffData.SpellName;
+                        modified = true;
+                    }
+
+                    if (modifiedEnchantment.CastType != staffData.Spell.CastType)
+                    {
+                        modifiedEnchantment.CastType = staffData.Spell.CastType;
+                        modified = true;
+                    }
+
+                    if (modifiedEnchantment.TargetType != staffData.Spell.TargetType)
+                    {
+                        modifiedEnchantment.TargetType = staffData.Spell.TargetType;
+                        modified = true;
+                    }
+
+                    var newEffects = spellToStaffEffects(staffData);
+
+                    if (!modifiedEnchantment.Effects.Equals(newEffects))
+                    {
+                        modifiedEnchantment.Effects.Clear();
+                        modifiedEnchantment.Effects.AddRange(newEffects);
+                        modified = true;
+                    }
+
+                    if (modified)
+                    {
+                        state.PatchMod.ObjectEffects.Set(modifiedEnchantment);
+                        staffData.Enchantment = modifiedEnchantment;
+                    }
                 }
 
             var claimedStaves = new HashSet<IWeaponGetter>();
