@@ -63,17 +63,11 @@ namespace StaffGenerator
                     path: "settings.json",
                     out Settings
                 )
-                .Run(args, new RunPreferences()
-                {
-                    ActionsForEmptyArgs = new RunDefaultPatcher()
-                    {
-                        IdentifyingModKey = "YourPatcher.esp",
-                        TargetRelease = GameRelease.SkyrimSE,
-                    }
-                });
+                .SetTypicalOpen(GameRelease.SkyrimSE, "YourPatcher.esp")
+                .Run(args);
         }
 
-        private static readonly Dictionary<FormKey, HashSet<FormKey>> HalfCostPerkIDToLevelledListIDs = new()
+        private static readonly Dictionary<IFormLinkGetter<IPerkGetter>, HashSet<IFormLink<ILeveledItemGetter>>> HalfCostPerkIDToLevelledListIDs = new()
         {
             { Skyrim.Perk.AlterationApprentice25, new() { Skyrim.LeveledItem.LItemStaffAlteration25 } },
             { Skyrim.Perk.AlterationExpert75, new() { Skyrim.LeveledItem.LItemStaffAlteration75 } },
@@ -94,7 +88,7 @@ namespace StaffGenerator
             { Skyrim.Perk.RestorationExpert75, new() { Skyrim.LeveledItem.LItemStaffRestoration75 } },
         };
 
-        private static readonly Dictionary<FormKey, (MagicSchool school, MagicLevel level)> HalfCostPerkIDToMagicSchoolAndLevel = new()
+        private static readonly Dictionary<IFormLinkGetter<IPerkGetter>, (MagicSchool school, MagicLevel level)> HalfCostPerkIDToMagicSchoolAndLevel = new()
         {
             { Skyrim.Perk.AlterationNovice00, (MagicSchool.Alteration, MagicLevel.Novice) },
             { Skyrim.Perk.AlterationApprentice25, (MagicSchool.Alteration, MagicLevel.Apprentice) },
@@ -133,42 +127,42 @@ namespace StaffGenerator
             CastType.FireAndForget
         };
 
-        private static readonly HashSet<FormKey> AllowedEquipmentTypes = new()
+        private static readonly HashSet<IFormLinkGetter<IEquipTypeGetter>> AllowedEquipmentTypes = new()
         {
             Skyrim.EquipType.EitherHand,
             Skyrim.EquipType.LeftHand,
             Skyrim.EquipType.RightHand
         };
 
-        private static readonly HashSet<ConditionData.Function> conditionFunctionsAlwaysFalseUsingAStaff = new()
+        private static readonly HashSet<Condition.Function> conditionFunctionsAlwaysFalseUsingAStaff = new()
         {
-            ConditionData.Function.EffectWasDualCast,
-            ConditionData.Function.IsDualCasting,
+            Condition.Function.EffectWasDualCast,
+            Condition.Function.IsDualCasting,
         };
 
-        private static readonly HashSet<ConditionData.Function> playerOnlyConditionFunctions = new()
+        private static readonly HashSet<Condition.Function> playerOnlyConditionFunctions = new()
         {
-            ConditionData.Function.IsPCAMurderer,
-            ConditionData.Function.GetPCExpelled,
-            ConditionData.Function.GetPCFactionMurder,
-            ConditionData.Function.GetPCEnemyofFaction,
-            ConditionData.Function.GetPCFactionAttack,
-            ConditionData.Function.GetVATSMode,
-            ConditionData.Function.GetPCMiscStat,
+            Condition.Function.IsPCAMurderer,
+            Condition.Function.GetPCExpelled,
+            Condition.Function.GetPCFactionMurder,
+            Condition.Function.GetPCEnemyofFaction,
+            Condition.Function.GetPCFactionAttack,
+            Condition.Function.GetVATSMode,
+            Condition.Function.GetPCMiscStat,
         };
 
-        private static readonly Dictionary<ConditionData.Function, ConditionData.Function> playerSpecificToCasterConditionFunctions = new()
+        private static readonly Dictionary<Condition.Function, Condition.Function> playerSpecificToCasterConditionFunctions = new()
         {
-            { ConditionData.Function.GetPCIsClass, ConditionData.Function.GetIsClass },
-            { ConditionData.Function.GetPCIsRace, ConditionData.Function.GetIsRace },
-            { ConditionData.Function.GetPCIsSex, ConditionData.Function.GetIsSex },
-            { ConditionData.Function.GetPCInFaction, ConditionData.Function.GetInFaction },
-            { ConditionData.Function.SameFactionAsPC, ConditionData.Function.SameFaction },
-            { ConditionData.Function.SameRaceAsPC, ConditionData.Function.SameRace },
-            { ConditionData.Function.SameSexAsPC, ConditionData.Function.SameSex },
+            { Condition.Function.GetPCIsClass, Condition.Function.GetIsClass },
+            { Condition.Function.GetPCIsRace, Condition.Function.GetIsRace },
+            { Condition.Function.GetPCIsSex, Condition.Function.GetIsSex },
+            { Condition.Function.GetPCInFaction, Condition.Function.GetInFaction },
+            { Condition.Function.SameFactionAsPC, Condition.Function.SameFaction },
+            { Condition.Function.SameRaceAsPC, Condition.Function.SameRace },
+            { Condition.Function.SameSexAsPC, Condition.Function.SameSex },
         };
 
-        private static readonly Dictionary<FormKey, MagicSchool> UnenchantedStaffIDByMagicSchool = new()
+        private static readonly Dictionary<IFormLinkGetter<IWeaponGetter>, MagicSchool> UnenchantedStaffIDByMagicSchool = new()
         {
             { Skyrim.Weapon.StaffTemplateAlteration, MagicSchool.Alteration },
             { Skyrim.Weapon.StaffTemplateConjuration, MagicSchool.Conjuration },
@@ -177,31 +171,14 @@ namespace StaffGenerator
             { Skyrim.Weapon.StaffTemplateRestoration, MagicSchool.Restoration },
         };
 
-        private static FormLinkNullable<T> NewFormLinkNullable<T>(T majorRecord) where T : class, IMajorRecordGetter
-        {
-            return new FormLinkNullable<T>(majorRecord.FormKey);
-        }
-
-        private static FormLink<T> NewFormLink<T>(FormLinkNullable<T> majorRecordLink) where T : class, IMajorRecordCommonGetter
-        {
-            return new FormLink<T>(majorRecordLink.FormKey);
-        }
-
-        private static FormLink<T> NewFormLink<T>(T majorRecord) where T : class, IMajorRecordGetter
-        {
-            return new FormLink<T>(majorRecord.FormKey);
-        }
-
         public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
         {
-            var modifiedQAStaffContainer = new Lazy<IContainer>(() => state.PatchMod.Containers.GetOrAddAsOverride(state.LinkCache.Resolve<IContainerGetter>(Skyrim.Container.QAStaffContainer)));
-
             ImmutableDictionary<string, IObjectEffectGetter> staffEnchantmentsByEditorID;
-            ImmutableDictionary<FormLink<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>> staffEnchantmentsByMagicEffect;
+            ImmutableDictionary<IFormLinkGetter<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>> staffEnchantmentsByMagicEffect;
 
             {
                 var staffEnchantmentsByEditorIDBuilder = ImmutableDictionary.CreateBuilder<string, IObjectEffectGetter>();
-                var staffEnchantmentsByMagicEffectTemp = new Dictionary<FormLink<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>.Builder>();
+                var staffEnchantmentsByMagicEffectTemp = new Dictionary<IFormLinkGetter<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>.Builder>();
 
                 foreach (var staffEnchantment in state.LoadOrder.PriorityOrder.ObjectEffect().WinningOverrides())
                 {
@@ -211,12 +188,12 @@ namespace StaffGenerator
                     {
                         var baseEffect = magicEffect.BaseEffect;
                         if (baseEffect.IsNull) continue;
-                        Autovivify(staffEnchantmentsByMagicEffectTemp, NewFormLink(baseEffect)).Add(staffEnchantment);
+                        Autovivify(staffEnchantmentsByMagicEffectTemp, baseEffect).Add(staffEnchantment);
                     }
                     staffEnchantmentsByEditorIDBuilder[staffEnchantment.EditorID] = staffEnchantment;
                 }
 
-                var staffEnchantmentsByMagicEffectBuilder = ImmutableDictionary.CreateBuilder<FormLink<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>>();
+                var staffEnchantmentsByMagicEffectBuilder = ImmutableDictionary.CreateBuilder<IFormLinkGetter<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>>();
                 foreach (var item in staffEnchantmentsByMagicEffectTemp)
                 {
                     staffEnchantmentsByMagicEffectBuilder[item.Key] = item.Value.ToImmutable();
@@ -226,33 +203,33 @@ namespace StaffGenerator
                 staffEnchantmentsByMagicEffect = staffEnchantmentsByMagicEffectBuilder.ToImmutable();
             }
 
-            ImmutableHashSet<FormLink<IWeaponGetter>> staves;
+            ImmutableHashSet<IFormLinkGetter<IWeaponGetter>> staves;
             ImmutableDictionary<string, IWeaponGetter> stavesByEditorID;
             ImmutableDictionary<MagicSchool, IWeaponGetter> unenchantedStavesByMagicSchool;
-            ImmutableDictionary<FormLink<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>> enchantedStavesByEnchantment;
+            ImmutableDictionary<IFormLinkGetter<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>> enchantedStavesByEnchantment;
 
             {
-                var stavesBuilder = ImmutableHashSet.CreateBuilder<FormLink<IWeaponGetter>>();
+                var stavesBuilder = ImmutableHashSet.CreateBuilder<IFormLinkGetter<IWeaponGetter>>();
                 var stavesByEditorIDBuilder = ImmutableDictionary.CreateBuilder<string, IWeaponGetter>();
                 var unenchantedStavesByMagicSchoolBuilder = ImmutableDictionary.CreateBuilder<MagicSchool, IWeaponGetter>();
-                var enchantedStavesByEnchantmentTemp = new Dictionary<FormLink<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>.Builder>();
+                var enchantedStavesByEnchantmentTemp = new Dictionary<IFormLinkGetter<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>.Builder>();
 
                 foreach (var staff in state.LoadOrder.PriorityOrder.Weapon().WinningOverrides())
                 {
                     if (staff.Keywords?.Contains(Skyrim.Keyword.WeapTypeStaff) != true) continue;
                     if (staff.EditorID is null) continue;
-                    if (UnenchantedStaffIDByMagicSchool.TryGetValue(staff.FormKey, out var magicSchool))
+                    if (UnenchantedStaffIDByMagicSchool.TryGetValue(staff.AsLink(), out var magicSchool))
                         unenchantedStavesByMagicSchoolBuilder.Add(magicSchool, staff);
                     if (!staff.ObjectEffect.IsNull)
                     {
                         if (staff.Template.IsNull) continue;
                         stavesBuilder.Add(staff.AsLink());
                         stavesByEditorIDBuilder[staff.EditorID] = staff;
-                        Autovivify(enchantedStavesByEnchantmentTemp, NewFormLink(staff.ObjectEffect)).Add(staff);
+                        Autovivify(enchantedStavesByEnchantmentTemp, staff.ObjectEffect).Add(staff);
                     }
                 }
 
-                var enchantedStavesByEnchantmentBuilder = ImmutableDictionary.CreateBuilder<FormLink<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>>();
+                var enchantedStavesByEnchantmentBuilder = ImmutableDictionary.CreateBuilder<IFormLinkGetter<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>>();
                 foreach (var item in enchantedStavesByEnchantmentTemp)
                 {
                     enchantedStavesByEnchantmentBuilder[item.Key] = item.Value.ToImmutable();
@@ -264,34 +241,34 @@ namespace StaffGenerator
                 enchantedStavesByEnchantment = enchantedStavesByEnchantmentBuilder.ToImmutable();
             }
 
-            ImmutableDictionary<FormLink<IWeaponGetter>, IConstructibleObjectGetter> recipesByCreatedStaff;
+            ImmutableDictionary<IFormLinkGetter<IWeaponGetter>, IConstructibleObjectGetter> recipesByCreatedStaff;
 
             {
-                var recipesByCreatedStaffBuilder = ImmutableDictionary.CreateBuilder<FormLink<IWeaponGetter>, IConstructibleObjectGetter>();
+                var recipesByCreatedStaffBuilder = ImmutableDictionary.CreateBuilder<IFormLinkGetter<IWeaponGetter>, IConstructibleObjectGetter>();
 
                 foreach (var recipe in state.LoadOrder.PriorityOrder.ConstructibleObject().WinningOverrides())
                 {
                     if (recipe.CreatedObjectCount.HasValue)
                         if (!(recipe.CreatedObjectCount.Value == 1)) continue;
                     if (recipe.CreatedObject.IsNull) continue;
-                    if (!staves.Contains(recipe.CreatedObject.FormKey)) continue;
+                    if (!staves.Contains(recipe.CreatedObject.Cast<IWeaponGetter>())) continue;
                     recipesByCreatedStaffBuilder[new FormLink<IWeaponGetter>(recipe.CreatedObject.FormKey)] = recipe;
                 }
 
                 recipesByCreatedStaff = recipesByCreatedStaffBuilder.ToImmutable();
             }
 
-            ImmutableDictionary<FormKey, ILeveledItemGetter> leveledListsByFormKey;
+            ImmutableDictionary<IFormLinkGetter<ILeveledItemGetter>, ILeveledItemGetter> leveledListsByFormKey;
             ImmutableDictionary<string, ILeveledItemGetter> leveledListsByEditorID;
 
             {
-                var leveledListsByFormKeyBuilder = ImmutableDictionary.CreateBuilder<FormKey, ILeveledItemGetter>();
+                var leveledListsByFormKeyBuilder = ImmutableDictionary.CreateBuilder<IFormLinkGetter<ILeveledItemGetter>, ILeveledItemGetter>();
                 var leveledListsByEditorIDBuilder = ImmutableDictionary.CreateBuilder<string, ILeveledItemGetter>();
 
                 foreach (var leveledList in state.LoadOrder.PriorityOrder.LeveledItem().WinningOverrides())
                 {
                     if (leveledList.EditorID is null) continue;
-                    leveledListsByFormKeyBuilder[leveledList.FormKey] = leveledList;
+                    leveledListsByFormKeyBuilder[leveledList.AsLink()] = leveledList;
                     leveledListsByEditorIDBuilder[leveledList.EditorID] = leveledList;
                 }
 
@@ -339,11 +316,11 @@ namespace StaffGenerator
                 if (spell.Type != SpellType.Spell) continue;
                 if (spell.TargetType == TargetType.Self) continue;
                 if (!AllowedCastTypes.Contains(spell.CastType)) continue;
-                if (!AllowedEquipmentTypes.Contains(spell.EquipmentType.FormKey)) continue;
+                if (!AllowedEquipmentTypes.Contains(spell.EquipmentType)) continue;
 
                 var halfCostPerkID = spell.HalfCostPerk;
 
-                if (!HalfCostPerkIDToMagicSchoolAndLevel.TryGetValue(halfCostPerkID.FormKey, out var magicSchoolAndLevel)) continue;
+                if (!HalfCostPerkIDToMagicSchoolAndLevel.TryGetValue(halfCostPerkID, out var magicSchoolAndLevel)) continue;
 
                 var (magicSchool, magicLevel) = magicSchoolAndLevel;
 
@@ -380,7 +357,7 @@ namespace StaffGenerator
                 {
                     var baseEffect = magicEffect.BaseEffect;
                     if (baseEffect.IsNull) continue;
-                    if (staffEnchantmentsByMagicEffect.TryGetValue(NewFormLink(baseEffect), out var candidateEnchantments1))
+                    if (staffEnchantmentsByMagicEffect.TryGetValue(baseEffect, out var candidateEnchantments1))
                     {
                         foreach (var candidateEnchantment in candidateEnchantments1)
                         {
@@ -481,7 +458,7 @@ namespace StaffGenerator
                     claimedStaves.Add(staffData.Staff);
             }
 
-            var newStavesByHalfCostPerk = new Dictionary<FormLink<IPerkGetter>, List<IWeapon>>();
+            var newStavesByHalfCostPerk = new Dictionary<IFormLinkGetter<IPerkGetter>, List<IWeapon>>();
 
             foreach (var staffData in stavesData)
             {
@@ -489,7 +466,7 @@ namespace StaffGenerator
                 if (staffData.Enchantment is null)
                     throw new NullReferenceException("Can't happen");
 
-                if (enchantedStavesByEnchantment.TryGetValue(NewFormLink<IEffectRecordGetter>(staffData.Enchantment), out var candidateStaves))
+                if (enchantedStavesByEnchantment.TryGetValue(staffData.Enchantment.AsLink(), out var candidateStaves))
                 {
                     var unenchantedStaffLink = staffData.UnenchantedStaff.AsLink();
 
@@ -544,11 +521,13 @@ namespace StaffGenerator
                 });
 
                 newStaff.Name = Settings.Value.StaffNamePrefix + staffData.SpellName + Settings.Value.StaffNameSuffix;
-                newStaff.Template = NewFormLinkNullable(staffData.UnenchantedStaff);
-                newStaff.ObjectEffect = NewFormLinkNullable<IEffectRecordGetter>(staffData.Enchantment);
+                newStaff.Template.SetTo(staffData.UnenchantedStaff);
+                newStaff.ObjectEffect.SetTo(staffData.Enchantment);
                 newStaff.EnchantmentAmount = staffData.EnchantmentAmount;
                 if (Settings.Value.SetStaffPriceToSpellBookPrice)
                     (newStaff.BasicStats ??= new()).Value = staffData.Book.Value;
+
+                var modifiedQAStaffContainer = new Lazy<IContainer>(() => state.PatchMod.Containers.GetOrAddAsOverride(Skyrim.Container.QAStaffContainer.Resolve(state.LinkCache)));
 
                 (modifiedQAStaffContainer.Value.Items ??= new()).Add(new()
                 {
@@ -591,7 +570,7 @@ namespace StaffGenerator
                 if (Settings.Value.StavesToNotRefreshRecipesFor.Contains(staffData.Staff)) continue;
 
                 IConstructibleObject newRecipe;
-                if (recipesByCreatedStaff.TryGetValue(staffData.Staff.FormKey, out var oldRrecipe))
+                if (recipesByCreatedStaff.TryGetValue(staffData.Staff.AsLink(), out var oldRrecipe))
                     newRecipe = state.PatchMod.ConstructibleObjects.GetOrAddAsOverride(oldRrecipe);
                 else
                     newRecipe = state.PatchMod.ConstructibleObjects.AddNew("DLC2Recipe" + staffData.StaffEditorID);
@@ -605,16 +584,16 @@ namespace StaffGenerator
                     ComparisonValue = 1,
                     Data = new FunctionConditionData()
                     {
-                        Function = (ushort)ConditionData.Function.HasSpell,
+                        Function = Condition.Function.HasSpell,
                         ParameterOneRecord = staffData.Spell.AsLink<ISkyrimMajorRecordGetter>(),
                         Unknown2 = 0,
-                        Unknown3 = (int)Condition.RunOnType.Reference,
-                        Unknown4 = 0x00000014, // PlayerRef [PLYR:000014]
-                        Unknown5 = -1
+                        RunOnType = Condition.RunOnType.Reference,
+                        Reference = Constants.Player.AsSetter(),
+                        Unknown3 = -1
                     }
                 });
-                newRecipe.CreatedObject = NewFormLinkNullable<IConstructibleGetter>(staffData.Staff);
-                newRecipe.WorkbenchKeyword = Dragonborn.Keyword.DLC2StaffEnchanter;
+                newRecipe.CreatedObject.SetTo(staffData.Staff);
+                newRecipe.WorkbenchKeyword.SetTo(Dragonborn.Keyword.DLC2StaffEnchanter);
                 newRecipe.CreatedObjectCount = 1;
             }
 
@@ -624,7 +603,7 @@ namespace StaffGenerator
             // TODO add found staves if they're not in already in the leveled lists?
             foreach (var (halfCostPerkID, newStaves) in newStavesByHalfCostPerk)
             {
-                var (magicSchool, magicLevel) = HalfCostPerkIDToMagicSchoolAndLevel[halfCostPerkID.FormKey];
+                var (magicSchool, magicLevel) = HalfCostPerkIDToMagicSchoolAndLevel[halfCostPerkID];
 
                 if (newStaves.Count > 1)
                     Console.WriteLine($"Adding {newStaves.Count} new {magicLevel} {magicSchool} staves to the appropriate leveled lists.");
@@ -634,7 +613,7 @@ namespace StaffGenerator
                 var leveledLists = new HashSet<ILeveledItemGetter>();
                 var modifiedLeveledLists = new List<ILeveledItem>();
 
-                if (HalfCostPerkIDToLevelledListIDs.TryGetValue(halfCostPerkID.FormKey, out var leveledListIDs))
+                if (HalfCostPerkIDToLevelledListIDs.TryGetValue(halfCostPerkID, out var leveledListIDs))
                     leveledLists.UnionWith(leveledListIDs.Select(x => leveledListsByFormKey[x]));
 
                 var magicLevelString = String.Format("{0:D2}", (int)magicLevel);
