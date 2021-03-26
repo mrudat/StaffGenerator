@@ -10,12 +10,6 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace System.Runtime.CompilerServices
-{
-    class IsExternalInit {
-    }
-}
-
 namespace StaffGenerator
 {
     record StaffData(IBookGetter Book, ISpellGetter Spell, string SpellName, string SpellEditorID, MagicSchool MagisSchool, MagicLevel MagicLevel, IWeaponGetter UnenchantedStaff, int HeartStoneCount, ushort EnchantmentAmount)
@@ -49,10 +43,13 @@ namespace StaffGenerator
         Master = 100
     };
 
-
-    public class Program
+    public partial class Program
     {
         static Lazy<Settings> Settings = null!;
+        private readonly Lazy<Settings> settings;
+        private readonly LoadOrder<IModListing<ISkyrimModGetter>> LoadOrder;
+        private readonly ILinkCache<ISkyrimMod, ISkyrimModGetter> LinkCache;
+        private readonly ISkyrimMod PatchMod;
 
         public static async Task<int> Main(string[] args)
         {
@@ -65,6 +62,19 @@ namespace StaffGenerator
                 )
                 .SetTypicalOpen(GameRelease.SkyrimSE, "YourPatcher.esp")
                 .Run(args);
+        }
+
+        public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
+        {
+            new Program(state.LoadOrder, state.LinkCache, state.PatchMod, Settings).RunPatch();
+        }
+
+        public Program(LoadOrder<IModListing<ISkyrimModGetter>> loadOrder, ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache, ISkyrimMod patchMod, Lazy<Settings> settings)
+        {
+            LoadOrder = loadOrder;
+            LinkCache = linkCache;
+            PatchMod = patchMod;
+            this.settings = settings;
         }
 
         private static readonly Dictionary<IFormLinkGetter<IPerkGetter>, HashSet<IFormLink<ILeveledItemGetter>>> HalfCostPerkIDToLevelledListIDs = new()
@@ -171,110 +181,26 @@ namespace StaffGenerator
             { Skyrim.Weapon.StaffTemplateRestoration, MagicSchool.Restoration },
         };
 
-        public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
+        public void RunPatch()
         {
-            ImmutableDictionary<string, IObjectEffectGetter> staffEnchantmentsByEditorID;
-            ImmutableDictionary<IFormLinkGetter<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>> staffEnchantmentsByMagicEffect;
+            IndexStaffEnchantments(
+                LoadOrder.PriorityOrder.ObjectEffect().WinningOverrides(),
+                out var staffEnchantmentsByEditorID,
+                out var staffEnchantmentsByMagicEffect);
 
-            {
-                var staffEnchantmentsByEditorIDBuilder = ImmutableDictionary.CreateBuilder<string, IObjectEffectGetter>();
-                var staffEnchantmentsByMagicEffectTemp = new Dictionary<IFormLinkGetter<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>.Builder>();
+            IndexWeapons(
+                LoadOrder.PriorityOrder.Weapon().WinningOverrides(),
+                out var staves,
+                out var stavesByEditorID,
+                out var unenchantedStavesByMagicSchool,
+                out var enchantedStavesByEnchantment);
 
-                foreach (var staffEnchantment in state.LoadOrder.PriorityOrder.ObjectEffect().WinningOverrides())
-                {
-                    if (staffEnchantment.EnchantType != ObjectEffect.EnchantTypeEnum.StaffEnchantment) continue;
-                    if (staffEnchantment.EditorID is null) continue;
-                    foreach (var magicEffect in staffEnchantment.Effects)
-                    {
-                        var baseEffect = magicEffect.BaseEffect;
-                        if (baseEffect.IsNull) continue;
-                        Autovivify(staffEnchantmentsByMagicEffectTemp, baseEffect).Add(staffEnchantment);
-                    }
-                    staffEnchantmentsByEditorIDBuilder[staffEnchantment.EditorID] = staffEnchantment;
-                }
+            var recipesByCreatedStaff = IndexRecipies(LoadOrder.PriorityOrder.ConstructibleObject().WinningOverrides(), staves);
 
-                var staffEnchantmentsByMagicEffectBuilder = ImmutableDictionary.CreateBuilder<IFormLinkGetter<IMagicEffectGetter>, ImmutableHashSet<IObjectEffectGetter>>();
-                foreach (var item in staffEnchantmentsByMagicEffectTemp)
-                {
-                    staffEnchantmentsByMagicEffectBuilder[item.Key] = item.Value.ToImmutable();
-                }
-
-                staffEnchantmentsByEditorID = staffEnchantmentsByEditorIDBuilder.ToImmutable();
-                staffEnchantmentsByMagicEffect = staffEnchantmentsByMagicEffectBuilder.ToImmutable();
-            }
-
-            ImmutableHashSet<IFormLinkGetter<IWeaponGetter>> staves;
-            ImmutableDictionary<string, IWeaponGetter> stavesByEditorID;
-            ImmutableDictionary<MagicSchool, IWeaponGetter> unenchantedStavesByMagicSchool;
-            ImmutableDictionary<IFormLinkGetter<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>> enchantedStavesByEnchantment;
-
-            {
-                var stavesBuilder = ImmutableHashSet.CreateBuilder<IFormLinkGetter<IWeaponGetter>>();
-                var stavesByEditorIDBuilder = ImmutableDictionary.CreateBuilder<string, IWeaponGetter>();
-                var unenchantedStavesByMagicSchoolBuilder = ImmutableDictionary.CreateBuilder<MagicSchool, IWeaponGetter>();
-                var enchantedStavesByEnchantmentTemp = new Dictionary<IFormLinkGetter<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>.Builder>();
-
-                foreach (var staff in state.LoadOrder.PriorityOrder.Weapon().WinningOverrides())
-                {
-                    if (staff.Keywords?.Contains(Skyrim.Keyword.WeapTypeStaff) != true) continue;
-                    if (staff.EditorID is null) continue;
-                    if (UnenchantedStaffIDByMagicSchool.TryGetValue(staff.AsLink(), out var magicSchool))
-                        unenchantedStavesByMagicSchoolBuilder.Add(magicSchool, staff);
-                    if (!staff.ObjectEffect.IsNull)
-                    {
-                        if (staff.Template.IsNull) continue;
-                        stavesBuilder.Add(staff.AsLink());
-                        stavesByEditorIDBuilder[staff.EditorID] = staff;
-                        Autovivify(enchantedStavesByEnchantmentTemp, staff.ObjectEffect).Add(staff);
-                    }
-                }
-
-                var enchantedStavesByEnchantmentBuilder = ImmutableDictionary.CreateBuilder<IFormLinkGetter<IEffectRecordGetter>, ImmutableHashSet<IWeaponGetter>>();
-                foreach (var item in enchantedStavesByEnchantmentTemp)
-                {
-                    enchantedStavesByEnchantmentBuilder[item.Key] = item.Value.ToImmutable();
-                }
-
-                staves = stavesBuilder.ToImmutable();
-                stavesByEditorID = stavesByEditorIDBuilder.ToImmutable();
-                unenchantedStavesByMagicSchool = unenchantedStavesByMagicSchoolBuilder.ToImmutable();
-                enchantedStavesByEnchantment = enchantedStavesByEnchantmentBuilder.ToImmutable();
-            }
-
-            ImmutableDictionary<IFormLinkGetter<IWeaponGetter>, IConstructibleObjectGetter> recipesByCreatedStaff;
-
-            {
-                var recipesByCreatedStaffBuilder = ImmutableDictionary.CreateBuilder<IFormLinkGetter<IWeaponGetter>, IConstructibleObjectGetter>();
-
-                foreach (var recipe in state.LoadOrder.PriorityOrder.ConstructibleObject().WinningOverrides())
-                {
-                    if (recipe.CreatedObjectCount.HasValue)
-                        if (!(recipe.CreatedObjectCount.Value == 1)) continue;
-                    if (recipe.CreatedObject.IsNull) continue;
-                    if (!staves.Contains(recipe.CreatedObject.Cast<IWeaponGetter>())) continue;
-                    recipesByCreatedStaffBuilder[new FormLink<IWeaponGetter>(recipe.CreatedObject.FormKey)] = recipe;
-                }
-
-                recipesByCreatedStaff = recipesByCreatedStaffBuilder.ToImmutable();
-            }
-
-            ImmutableDictionary<IFormLinkGetter<ILeveledItemGetter>, ILeveledItemGetter> leveledListsByFormKey;
-            ImmutableDictionary<string, ILeveledItemGetter> leveledListsByEditorID;
-
-            {
-                var leveledListsByFormKeyBuilder = ImmutableDictionary.CreateBuilder<IFormLinkGetter<ILeveledItemGetter>, ILeveledItemGetter>();
-                var leveledListsByEditorIDBuilder = ImmutableDictionary.CreateBuilder<string, ILeveledItemGetter>();
-
-                foreach (var leveledList in state.LoadOrder.PriorityOrder.LeveledItem().WinningOverrides())
-                {
-                    if (leveledList.EditorID is null) continue;
-                    leveledListsByFormKeyBuilder[leveledList.AsLink()] = leveledList;
-                    leveledListsByEditorIDBuilder[leveledList.EditorID] = leveledList;
-                }
-
-                leveledListsByFormKey = leveledListsByFormKeyBuilder.ToImmutable();
-                leveledListsByEditorID = leveledListsByEditorIDBuilder.ToImmutable();
-            }
+            IndexLeveledLists(
+                LoadOrder.PriorityOrder.LeveledItem().WinningOverrides(),
+                out var leveledListsByFormKey,
+                out var leveledListsByEditorID);
 
             Func<IWeaponGetter, int, ExtendedList<ContainerEntry>> makeNewRecipeIngredients = (unenchantedStaff, heartStoneCount) => new()
             {
@@ -296,17 +222,17 @@ namespace StaffGenerator
                 }
             };
 
-            makeNewRecipeIngredients = Memoize(makeNewRecipeIngredients);
+            makeNewRecipeIngredients = makeNewRecipeIngredients.Memoize();
 
             var stavesData = new List<StaffData>();
 
-            foreach (var book in state.LoadOrder.PriorityOrder.Book().WinningOverrides())
+            foreach (var book in LoadOrder.PriorityOrder.Book().WinningOverrides())
             {
-                if (Settings.Value.SpellBooksNotToCreateStavesFor.Contains(book)) continue;
+                if (settings.Value.SpellBooksNotToCreateStavesFor.Contains(book)) continue;
                 if (book.Teaches is not IBookSpellGetter spellBook) continue;
 
-                if (!spellBook.Spell.TryResolve(state.LinkCache, out var spell)) continue;
-                if (Settings.Value.SpellsNotToCreateStavesFor.Contains(spell)) continue;
+                if (!spellBook.Spell.TryResolve(LinkCache, out var spell)) continue;
+                if (settings.Value.SpellsNotToCreateStavesFor.Contains(spell)) continue;
 
                 if (spell.Name is null) continue;
                 if (spell.Name.String is null) continue;
@@ -390,7 +316,7 @@ namespace StaffGenerator
                     continue;
                 }
 
-                var newEnchantment = state.PatchMod.ObjectEffects.AddNew(staffData.EnchantmentEditorID);
+                var newEnchantment = PatchMod.ObjectEffects.AddNew(staffData.EnchantmentEditorID);
                 newEnchantment.Name = staffData.SpellName;
                 newEnchantment.CastType = staffData.Spell.CastType;
                 newEnchantment.TargetType = staffData.Spell.TargetType;
@@ -402,12 +328,12 @@ namespace StaffGenerator
                 staffData.Enchantment = newEnchantment;
             }
 
-            if (Settings.Value.CopySpellEffectsToExistingStaffEnchantments)
+            if (settings.Value.CopySpellEffectsToExistingStaffEnchantments)
                 foreach (var staffData in stavesData)
                 {
                     if (staffData.Enchantment is null) throw new NullReferenceException(); // Can't happen.
                     if (!staffData.EnchantmentExisted) continue;
-                    if (Settings.Value.StaffEnchantmentsNotToRefresh.Contains(staffData.Enchantment)) continue;
+                    if (settings.Value.StaffEnchantmentsNotToRefresh.Contains(staffData.Enchantment)) continue;
 
                     var enchantment = staffData.Enchantment;
                     var modifiedEnchantment = enchantment.DeepCopy();
@@ -443,7 +369,7 @@ namespace StaffGenerator
 
                     if (modified)
                     {
-                        state.PatchMod.ObjectEffects.Set(modifiedEnchantment);
+                        PatchMod.ObjectEffects.Set(modifiedEnchantment);
                         staffData.Enchantment = modifiedEnchantment;
                     }
                 }
@@ -505,11 +431,12 @@ namespace StaffGenerator
                     }
                 }
 
-                if (staffData.Staff is not null) { 
-                    continue; 
+                if (staffData.Staff is not null)
+                {
+                    continue;
                 }
 
-                var newStaff = state.PatchMod.Weapons.AddNew(staffData.StaffEditorID);
+                var newStaff = PatchMod.Weapons.AddNew(staffData.StaffEditorID);
                 staffData.StaffExisted = false;
                 newStaff.DeepCopyIn(staffData.UnenchantedStaff, new Weapon.TranslationMask(true)
                 {
@@ -520,14 +447,14 @@ namespace StaffGenerator
                     EnchantmentAmount = false
                 });
 
-                newStaff.Name = Settings.Value.StaffNamePrefix + staffData.SpellName + Settings.Value.StaffNameSuffix;
+                newStaff.Name = settings.Value.StaffNamePrefix + staffData.SpellName + settings.Value.StaffNameSuffix;
                 newStaff.Template.SetTo(staffData.UnenchantedStaff);
                 newStaff.ObjectEffect.SetTo(staffData.Enchantment);
                 newStaff.EnchantmentAmount = staffData.EnchantmentAmount;
-                if (Settings.Value.SetStaffPriceToSpellBookPrice)
+                if (settings.Value.SetStaffPriceToSpellBookPrice)
                     (newStaff.BasicStats ??= new()).Value = staffData.Book.Value;
 
-                var modifiedQAStaffContainer = new Lazy<IContainer>(() => state.PatchMod.Containers.GetOrAddAsOverride(Skyrim.Container.QAStaffContainer.Resolve(state.LinkCache)));
+                var modifiedQAStaffContainer = new Lazy<IContainer>(() => PatchMod.Containers.GetOrAddAsOverride(Skyrim.Container.QAStaffContainer.Resolve(LinkCache)));
 
                 (modifiedQAStaffContainer.Value.Items ??= new()).Add(new()
                 {
@@ -538,7 +465,7 @@ namespace StaffGenerator
                     }
                 });
 
-                Autovivify(newStavesByHalfCostPerk, staffData.Spell.HalfCostPerk).Add(newStaff);
+                newStavesByHalfCostPerk.Autovivify(staffData.Spell.HalfCostPerk).Add(newStaff);
 
                 staffData.Staff = newStaff;
             }
@@ -550,14 +477,14 @@ namespace StaffGenerator
 
                 if (!staffData.StaffExisted) continue;
 
-                if (!(Settings.Value.OverrideNamesOfExistingStaves || Settings.Value.SetStaffPriceToSpellBookPrice)) continue;
+                if (!(settings.Value.OverrideNamesOfExistingStaves || settings.Value.SetStaffPriceToSpellBookPrice)) continue;
 
-                var modifiedStaff = state.PatchMod.Weapons.GetOrAddAsOverride(staffData.Staff);
+                var modifiedStaff = PatchMod.Weapons.GetOrAddAsOverride(staffData.Staff);
 
-                if (Settings.Value.OverrideNamesOfExistingStaves)
-                    modifiedStaff.Name = Settings.Value.StaffNamePrefix + staffData.SpellName + Settings.Value.StaffNameSuffix;
-                
-                if (Settings.Value.SetStaffPriceToSpellBookPrice)
+                if (settings.Value.OverrideNamesOfExistingStaves)
+                    modifiedStaff.Name = settings.Value.StaffNamePrefix + staffData.SpellName + settings.Value.StaffNameSuffix;
+
+                if (settings.Value.SetStaffPriceToSpellBookPrice)
                     (modifiedStaff.BasicStats ??= new()).Value = staffData.Book.Value;
 
                 staffData.Staff = modifiedStaff;
@@ -567,13 +494,13 @@ namespace StaffGenerator
             {
                 if (staffData.Staff is null)
                     throw new NullReferenceException("Can't happen");
-                if (Settings.Value.StavesToNotRefreshRecipesFor.Contains(staffData.Staff)) continue;
+                if (settings.Value.StavesToNotRefreshRecipesFor.Contains(staffData.Staff)) continue;
 
                 IConstructibleObject newRecipe;
                 if (recipesByCreatedStaff.TryGetValue(staffData.Staff.AsLink(), out var oldRrecipe))
-                    newRecipe = state.PatchMod.ConstructibleObjects.GetOrAddAsOverride(oldRrecipe);
+                    newRecipe = PatchMod.ConstructibleObjects.GetOrAddAsOverride(oldRrecipe);
                 else
-                    newRecipe = state.PatchMod.ConstructibleObjects.AddNew("DLC2Recipe" + staffData.StaffEditorID);
+                    newRecipe = PatchMod.ConstructibleObjects.AddNew("DLC2Recipe" + staffData.StaffEditorID);
 
                 newRecipe.Items = makeNewRecipeIngredients(staffData.UnenchantedStaff, staffData.HeartStoneCount);
 
@@ -623,11 +550,11 @@ namespace StaffGenerator
                     leveledLists.Add(leveledList);
                 else
                 {
-                    var newLeveledList = state.PatchMod.LeveledItems.AddNew(leveledListEditorID);
+                    var newLeveledList = PatchMod.LeveledItems.AddNew(leveledListEditorID);
                     newLeveledList.ChanceNone = 0;
                     newLeveledList.Flags = LeveledItem.Flag.CalculateForEachItemInCount | LeveledItem.Flag.CalculateFromAllLevelsLessThanOrEqualPlayer;
 
-                    (Autovivify(leveledListByMagicLevel, magicLevel, () => state.PatchMod.LeveledItems.GetOrAddAsOverride(leveledListsByEditorID[$"LItemStaff{magicLevelString}"])).Entries ??= new()).Add(new()
+                    (leveledListByMagicLevel.Autovivify(magicLevel, () => PatchMod.LeveledItems.GetOrAddAsOverride(leveledListsByEditorID[$"LItemStaff{magicLevelString}"])).Entries ??= new()).Add(new()
                     {
                         Data = new()
                         {
@@ -641,7 +568,7 @@ namespace StaffGenerator
                 }
 
                 foreach (var leveledList2 in leveledLists)
-                    modifiedLeveledLists.Add(Autovivify(modifiedLeveledListByFormKey, leveledList2.FormKey, () => state.PatchMod.LeveledItems.GetOrAddAsOverride(leveledList2)));
+                    modifiedLeveledLists.Add(modifiedLeveledListByFormKey.Autovivify(leveledList2.FormKey, () => PatchMod.LeveledItems.GetOrAddAsOverride(leveledList2)));
 
                 var leveledItems = newStaves.Select(staff => new LeveledItemEntry()
                 {
@@ -658,34 +585,11 @@ namespace StaffGenerator
             }
         }
 
-        private static Func<T, TResult> Memoize<T, TResult>(Func<T, TResult> func) where T : notnull
-        {
-            var cache = new ConcurrentDictionary<T, TResult>();
-            return a => cache.GetOrAdd(a, func);
-        }
-
-        private static Func<T1, T2, TResult> Memoize<T1, T2, TResult>(Func<T1, T2, TResult> func)
-        {
-            var cache = new ConcurrentDictionary<(T1 a, T2 b), TResult>();
-            return (a, b) => cache.GetOrAdd((a, b), (x) => func(x.a, x.b));
-        }
-
         private static string PrettyPrintMajorRecord(IMajorRecordGetter record)
         {
             if (record is INamedGetter hasName)
                 return $"{record.EditorID} \"{hasName.Name}\" {record.FormKey}";
             return $"{record.EditorID} {record.FormKey}";
-        }
-
-        private static V Autovivify<K, V>(IDictionary<K, V> dict, K key) where K : notnull where V : new() => Autovivify(dict, key, () => new());
-
-        private static ImmutableHashSet<V>.Builder Autovivify<K, V>(IDictionary<K, ImmutableHashSet<V>.Builder> dict, K key) where K : notnull => Autovivify(dict, key, () => ImmutableHashSet.CreateBuilder<V>());
-
-        private static V Autovivify<K, V>(IDictionary<K, V> dict, K key, Func<V> newThing) where K : notnull
-        {
-            if (!dict.TryGetValue(key, out var value))
-                value = dict[key] = newThing();
-            return value;
         }
     }
 }
