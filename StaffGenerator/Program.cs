@@ -1,5 +1,10 @@
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.FormKeys.SkyrimSE;
+using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Aspects;
+using Mutagen.Bethesda.Plugins.Cache;
+using Mutagen.Bethesda.Plugins.Order;
+using Mutagen.Bethesda.Plugins.Records;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
 using Noggog;
@@ -47,7 +52,7 @@ namespace StaffGenerator
     {
         static Lazy<Settings> Settings = null!;
         private readonly Lazy<Settings> settings;
-        private readonly LoadOrder<IModListing<ISkyrimModGetter>> LoadOrder;
+        private readonly ILoadOrder<IModListing<ISkyrimModGetter>> LoadOrder;
         private readonly ILinkCache<ISkyrimMod, ISkyrimModGetter> LinkCache;
         private readonly ISkyrimMod PatchMod;
 
@@ -69,7 +74,7 @@ namespace StaffGenerator
             new Program(state.LoadOrder, state.LinkCache, state.PatchMod, Settings).RunPatch();
         }
 
-        public Program(LoadOrder<IModListing<ISkyrimModGetter>> loadOrder, ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache, ISkyrimMod patchMod, Lazy<Settings> settings)
+        public Program(ILoadOrder<IModListing<ISkyrimModGetter>> loadOrder, ILinkCache<ISkyrimMod, ISkyrimModGetter> linkCache, ISkyrimMod patchMod, Lazy<Settings> settings)
         {
             LoadOrder = loadOrder;
             LinkCache = linkCache;
