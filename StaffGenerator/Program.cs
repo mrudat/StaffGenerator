@@ -213,7 +213,7 @@ namespace StaffGenerator
                 {
                     Item = new()
                     {
-                        Item = unenchantedStaff.AsLink<IItemGetter>(),
+                        Item = unenchantedStaff.ToLink<IItemGetter>(),
                         Count = 1
                     }
                 },
@@ -397,9 +397,9 @@ namespace StaffGenerator
                 if (staffData.Enchantment is null)
                     throw new NullReferenceException("Can't happen");
 
-                if (enchantedStavesByEnchantment.TryGetValue(staffData.Enchantment.AsLink(), out var candidateStaves))
+                if (enchantedStavesByEnchantment.TryGetValue(staffData.Enchantment.ToLink(), out var candidateStaves))
                 {
-                    var unenchantedStaffLink = staffData.UnenchantedStaff.AsLink();
+                    var unenchantedStaffLink = staffData.UnenchantedStaff.ToLink();
 
                     var filteredCandidates = (
                         from candidateStaff in candidateStaves
@@ -465,7 +465,7 @@ namespace StaffGenerator
                 {
                     Item = new()
                     {
-                        Item = newStaff.AsLink<IItemGetter>(),
+                        Item = newStaff.ToLink<IItemGetter>(),
                         Count = 1
                     }
                 });
@@ -502,7 +502,7 @@ namespace StaffGenerator
                 if (settings.Value.StavesToNotRefreshRecipesFor.Contains(staffData.Staff)) continue;
 
                 IConstructibleObject newRecipe;
-                if (recipesByCreatedStaff.TryGetValue(staffData.Staff.AsLink(), out var oldRrecipe))
+                if (recipesByCreatedStaff.TryGetValue(staffData.Staff.ToLink(), out var oldRrecipe))
                     newRecipe = PatchMod.ConstructibleObjects.GetOrAddAsOverride(oldRrecipe);
                 else
                     newRecipe = PatchMod.ConstructibleObjects.AddNew("DLC2Recipe" + staffData.StaffEditorID);
@@ -517,7 +517,7 @@ namespace StaffGenerator
                     Data = new FunctionConditionData()
                     {
                         Function = Condition.Function.HasSpell,
-                        ParameterOneRecord = staffData.Spell.AsLink<ISkyrimMajorRecordGetter>(),
+                        ParameterOneRecord = staffData.Spell.ToLink<ISkyrimMajorRecordGetter>(),
                         Unknown2 = 0,
                         RunOnType = Condition.RunOnType.Reference,
                         Reference = Constants.Player.AsSetter(),
@@ -564,7 +564,7 @@ namespace StaffGenerator
                         Data = new()
                         {
                             Level = 1,
-                            Reference = newLeveledList.AsLink<IItemGetter>(),
+                            Reference = newLeveledList.ToLink<IItemGetter>(),
                             Count = 1,
                         }
                     });
@@ -580,7 +580,7 @@ namespace StaffGenerator
                     Data = new()
                     {
                         Level = 1,
-                        Reference = staff.AsLink<IItemGetter>(),
+                        Reference = staff.ToLink<IItemGetter>(),
                         Count = 1,
                     }
                 }).ToList();

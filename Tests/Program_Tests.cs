@@ -124,14 +124,14 @@ namespace Tests
             Assert.True(linkCache.TryResolve<ObjectEffect>(enchantmentEditorId, out var staffEnchantment));
             Assert.NotNull(staffEnchantment);
             if (createStaffEnchantment)
-                Assert.Equal(enchantmentLink.AsGetter(), staffEnchantment?.AsLinkGetter());
+                Assert.Equal(enchantmentLink.AsGetter(), staffEnchantment?.ToLinkGetter());
 
             Assert.True(linkCache.TryResolve<IWeaponGetter>(staffEditorID, out var staff));
             Assert.NotNull(staff);
             if (createStaff)
-                Assert.Equal(staffLink.AsGetter(), staff?.AsLinkGetter());
+                Assert.Equal(staffLink.AsGetter(), staff?.ToLinkGetter());
 
-            Assert.Equal(staffEnchantment?.AsNullableLink(), staff?.ObjectEffect);
+            Assert.Equal(staffEnchantment?.ToNullableLink(), staff?.ObjectEffect);
         }
 
         private void AddStaffTemplateDestruction()

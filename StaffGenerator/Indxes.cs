@@ -27,7 +27,7 @@ namespace StaffGenerator
             foreach (var leveledList in leveledLists)
             {
                 if (leveledList.EditorID is null) continue;
-                leveledListsByFormKeyBuilder[leveledList.AsLink()] = leveledList;
+                leveledListsByFormKeyBuilder[leveledList.ToLink()] = leveledList;
                 leveledListsByEditorIDBuilder[leveledList.EditorID] = leveledList;
             }
 
@@ -74,12 +74,12 @@ namespace StaffGenerator
             {
                 if (staff.Keywords?.Contains(Skyrim.Keyword.WeapTypeStaff) != true) continue;
                 if (staff.EditorID is null) continue;
-                if (UnenchantedStaffIDByMagicSchool.TryGetValue(staff.AsLink(), out var magicSchool))
+                if (UnenchantedStaffIDByMagicSchool.TryGetValue(staff.ToLink(), out var magicSchool))
                     unenchantedStavesByMagicSchoolBuilder.Add(magicSchool, staff);
                 if (!staff.ObjectEffect.IsNull)
                 {
                     if (staff.Template.IsNull) continue;
-                    stavesBuilder.Add(staff.AsLink());
+                    stavesBuilder.Add(staff.ToLink());
                     stavesByEditorIDBuilder[staff.EditorID] = staff;
                     enchantedStavesByEnchantmentTemp.Autovivify(staff.ObjectEffect).Add(staff);
                 }
